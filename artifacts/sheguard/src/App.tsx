@@ -1,62 +1,248 @@
-import { type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ErrorBoundary } from '@/components/error-boundary';
-import { Toaster } from '@/components/ui/toaster';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import NotFound from '@/pages/not-found';
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentType, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
+import { Link, Route, Switch, useLocation } from 'wouter';
 import {
-  Route,
-  Switch,
-  useLocation,
-  Router as WouterRouter,
-} from 'wouter';
+  AlertCircle, ArrowRight, BookOpen, CalendarClock, Check, CheckCircle2, ChevronRight,
+  CircleHelp, Clipboard, Clock3, ExternalLink, FileDown, HeartHandshake, House,
+  Info, LockKeyhole, LogOut, Map, Menu, Moon, Pencil, Phone, Plus, Search,
+  Settings2, Shield, ShieldCheck, Siren, Sun, Trash2, UsersRound, X, Ban,
+} from 'lucide-react';
+import {
+  clearDemoState, demoCredentials, guideEntries, initialState, makeId, readDemoState,
+  resourceEntries, type CommunityPost, type Contact, type DemoState, type LocalReport,
+  validateContact,
+} from './data';
+import './index.css';
 
-const queryClient = new QueryClient();
+type Icon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+type Props = { state: DemoState; setState: Dispatch<SetStateAction<DemoState>>; flash: (message: string) => void; clearData?: () => void };
 
-function Home() {
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Replit Agent is building...
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Your app will appear here once it's ready.
-        </p>
-      </div>
+const navItems: { href: string; label: string; icon: Icon }[] = [
+  { href: '/dashboard', label: 'Overview', icon: House },
+  { href: '/sos', label: 'SOS plan', icon: Siren },
+  { href: '/contacts', label: 'Trusted contacts', icon: UsersRound },
+  { href: '/check-in', label: 'Safety check-in', icon: Clock3 },
+  { href: '/map', label: 'Safety map', icon: Map },
+  { href: '/resources', label: 'Resource guide', icon: BookOpen },
+  { href: '/rights', label: 'Know your rights', icon: ShieldCheck },
+  { href: '/digital-safety', label: 'Digital safety', icon: LockKeyhole },
+  { href: '/empowerment', label: 'Empowerment', icon: HeartHandshake },
+  { href: '/community', label: 'Community', icon: UsersRound },
+  { href: '/assistant', label: 'SheGuide', icon: CircleHelp },
+  { href: '/privacy', label: 'Privacy & demo data', icon: LockKeyhole },
+];
+
+function initials(name: string) { return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase(); }
+function formatDate(value: number) { return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(value); }
+function Button({ children, className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { children: ReactNode; className?: string }) {
+  return <button {...props} className={`btn ${className}`}>{children}</button>;
+}
+function PageHeading({ eyebrow, title, subtitle, action }: { eyebrow: string; title: string; subtitle: string; action?: ReactNode }) {
+  return <div className="page-heading"><div><div className="eyebrow" style={{ color: 'hsl(var(--accent-foreground))' }}>{eyebrow}</div><h1 className="page-title">{title}</h1><p className="page-subtitle">{subtitle}</p></div>{action}</div>;
+}
+function DemoNotice({ children = 'Presentation demo — information and actions stay in this browser only. Use fictional contact details.' }: { children?: ReactNode }) {
+  return <div className="notice"><Info size={17} /><span>{children}</span></div>;
+}
+function EmptyState({ icon: IconComp, title, children }: { icon: Icon; title: string; children: ReactNode }) {
+  return <div className="empty"><IconComp size={27} /><strong>{title}</strong><div style={{ marginTop: 6, fontSize: 12 }}>{children}</div></div>;
+}
+
+function Login({ setState, flash }: Pick<Props, 'setState' | 'flash'>) {
+  const [, setLocation] = useLocation();
+  const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState('');
+  const fill = (role: 'user' | 'admin') => { setEmail(role === 'user' ? 'demo@sheguard.test' : 'admin@sheguard.test'); setPassword(role === 'user' ? 'Demo@12345' : 'Admin@12345'); setError(''); };
+  const submit = (event: FormEvent) => {
+    event.preventDefault(); const role = demoCredentials(email.trim(), password);
+    if (!role) { setError('Use one of the test-only demo accounts below.'); return; }
+    setState((current) => ({ ...current, session: { email: email.trim().toLowerCase(), role } }));
+    flash(role === 'admin' ? 'Admin presentation session started.' : 'Demo session started.');
+    setLocation('/dashboard');
+  };
+  return <main className="login-page">
+    <section className="login-aside">
+      <div className="brand"><div className="brand-mark">S</div><div className="brand-name">SheGuard</div></div>
+      <div className="eyebrow" style={{ color: 'hsl(var(--accent))' }}>A practical companion</div>
+      <h1>More prepared.<br />More in control.</h1>
+      <p>Build a small safety plan that fits your day. SheGuard makes the next useful step clear, while keeping the boundaries of this demo visible.</p>
+      <div className="login-points"><div className="login-point"><ShieldCheck size={17} /> Your choices stay local in this browser</div><div className="login-point"><LockKeyhole size={17} /> No automatic alerts or location storage</div></div>
+    </section>
+    <section className="login-form-side"><div className="login-card">
+      <div className="eyebrow" style={{ color: 'hsl(var(--accent-foreground))' }}>Welcome</div>
+      <h2>Sign in to your demo</h2><p>Try the prepared account, or explore the admin review view.</p>
+      <DemoNotice>Demo only. This is not production authentication or secure account storage. Use fictional details only.</DemoNotice>
+      <form onSubmit={submit} className="form-grid" style={{ marginTop: 22 }}>
+        <div className="field"><label htmlFor="email">Email</label><input data-testid="input-email" id="email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="demo@sheguard.test" /></div>
+        <div className="field"><label htmlFor="password">Password</label><input data-testid="input-password" id="password" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Demo@12345" /></div>
+        {error && <div className="notice warning" data-testid="status-login-error"><AlertCircle size={16} />{error}</div>}
+        <Button data-testid="button-sign-in" type="submit" className="btn-primary">Enter demo <ArrowRight size={16} /></Button>
+      </form>
+      <div style={{ display: 'flex', gap: 9, marginTop: 13, flexWrap: 'wrap' }}><Button data-testid="button-demo-login" className="btn-soft btn-small" onClick={() => fill('user')}>Fill user demo</Button><Button data-testid="button-admin-login" className="btn-soft btn-small" onClick={() => fill('admin')}>Fill admin demo</Button></div>
+      <div style={{ marginTop: 30, borderTop: '1px solid hsl(var(--border))', paddingTop: 20 }}><div className="footer-note"><strong>Not configured:</strong> create-account and password-reset flows are intentionally unavailable in this presentation build.</div><div style={{ display: 'flex', gap: 15, marginTop: 13 }}><Button data-testid="button-create-account" className="btn-ghost btn-small" onClick={() => flash('Create account is not configured in this demo.')}>Create account</Button><Button data-testid="button-reset-password" className="btn-ghost btn-small" onClick={() => flash('Password reset is not configured in this demo.')}>Reset password</Button></div></div>
+    </div></section>
+  </main>;
+}
+
+function Shell({ children, state, setState, flash }: Props & { children: ReactNode }) {
+  const [location, setLocation] = useLocation(); const [mobileOpen, setMobileOpen] = useState(false);
+  const current = navItems.find((item) => location === item.href)?.label ?? 'SheGuard';
+  const tamil: Record<string, string> = { Overview: 'முகப்பு', 'Trusted contacts': 'நம்பிக்கை தொடர்புகள்', 'Safety check-in': 'பாதுகாப்பு சரிபார்ப்பு', 'Resource guide': 'வள வழிகாட்டி', 'Digital safety': 'டிஜிட்டல் பாதுகாப்பு', Empowerment: 'தன்னம்பிக்கை', Community: 'சமூகம்', 'Privacy & demo data': 'தனியுரிமை' };
+  const displayLabel = (label: string) => state.language === 'Tamil' ? (tamil[label] ?? label) : label;
+  const logout = () => { setState((s) => ({ ...s, session: null })); setLocation('/login'); };
+  const setTheme = () => setState((s) => ({ ...s, theme: s.theme === 'light' ? 'dark' : 'light' }));
+  return <div className="app-shell">
+    <aside className="sidebar">
+      <Link href="/dashboard" className="brand" data-testid="link-brand"><div className="brand-mark">S</div><div className="brand-name">SheGuard</div></Link>
+      <div className="eyebrow nav-label">{state.language === 'Tamil' ? 'உங்கள் இடம்' : 'Your space'}</div><nav className="nav-list">{navItems.map(({ href, label, icon: NavIcon }) => <Link key={href} href={href} className={`nav-item ${location === href ? 'active' : ''}`} data-testid={`link-nav-${href.slice(1)}`}><NavIcon size={17} /><span>{displayLabel(label)}</span></Link>)}</nav>
+      {state.session?.role === 'admin' && <><div className="eyebrow nav-label" style={{ marginTop: 24 }}>Presentation</div><Link href="/admin" className={`nav-item ${location === '/admin' ? 'active' : ''}`} data-testid="link-nav-admin"><Settings2 size={17} /><span>Admin review</span></Link></>}
+      <div className="sidebar-bottom"><div className="demo-badge"><div className="eyebrow" style={{ color: 'hsl(var(--accent))', marginBottom: 7 }}>Local demo</div>Nothing here sends alerts, stores location, or replaces official help.</div><Button data-testid="button-sidebar-logout" className="btn-ghost" onClick={logout}><LogOut size={15} /> Sign out</Button></div>
+    </aside>
+    <div className="main-wrap">
+      <header className="topbar"><div style={{ display: 'flex', alignItems: 'center', gap: 11 }}><Button data-testid="button-mobile-menu" className="icon-btn mobile-menu" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle navigation"><Menu size={18} /></Button><div className="topbar-title">{current}</div></div><div className="topbar-actions">
+        <select aria-label="Primary language" data-testid="select-language" className="select" style={{ width: 115, minHeight: 38, padding: '0 9px' }} value={state.language} onChange={(e) => setState((s) => ({ ...s, language: e.target.value as DemoState['language'] }))}><option>English</option><option>Tamil</option></select>
+        <Button data-testid="button-toggle-theme" className="icon-btn" onClick={setTheme} aria-label="Toggle light and dark mode">{state.theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}</Button>
+        <div className="avatar" data-testid="text-session-initials">{initials(state.session?.email ?? 'Demo')}</div>
+      </div></header>
+      <div className="demo-strip" data-testid="status-demo-warning">Presentation demo · data stays in this browser · use fictional contact details only</div>
+      {mobileOpen && <div style={{ padding: 12, background: 'hsl(var(--sidebar))', display: 'grid', gap: 3 }}>{navItems.map(({ href, label, icon: NavIcon }) => <Link onClick={() => setMobileOpen(false)} key={href} href={href} className="nav-item" data-testid={`link-mobile-${href.slice(1)}`}><NavIcon size={16} />{displayLabel(label)}</Link>)}{state.session?.role === 'admin' && <Link onClick={() => setMobileOpen(false)} href="/admin" className="nav-item" data-testid="link-mobile-admin"><Settings2 size={16} />Admin review</Link>}</div>}
+      <main className="content">{children}</main>
     </div>
-  );
+  </div>;
 }
 
-function Router() {
-  return (
-    // Keep a shared shell (sidebar, navbar) outside the boundary so it
-    // survives a page crash.
-    <RoutedErrorBoundary>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route component={NotFound} />
-      </Switch>
-    </RoutedErrorBoundary>
-  );
+function Dashboard({ state }: Props) {
+  const active = state.checkIn?.status === 'active' && state.checkIn.deadline > Date.now();
+  return <><PageHeading eyebrow="Good to see you" title="Welcome back 👋" subtitle="A quiet place to prepare, check in, and find the next useful step." action={<Link href="/sos" className="btn btn-danger" data-testid="link-dashboard-sos"><Siren size={16} /> Open SOS plan</Link>} />
+    <div className="grid grid-main"><section className="hero-panel"><div className="eyebrow" style={{ color: 'hsl(var(--accent))' }}>Today, on your terms</div><h2>Small plans can create more room to breathe.</h2><p>Start with one trusted contact, a timed check-in, or a resource you want to understand better.</p><div className="row-actions"><Link href="/check-in" className="btn btn-accent" data-testid="link-dashboard-checkin">Set a check-in <ArrowRight size={15} /></Link><Link href="/assistant" className="btn btn-ghost" style={{ color: 'inherit' }} data-testid="link-dashboard-guide">Ask SheGuide</Link></div></section>
+      <div className="grid"><div className="card stat-card"><div className="eyebrow">Trusted contacts</div><div className="stat-value" data-testid="text-contact-count">{state.contacts.length}</div><div className="stat-note">{state.contacts.length ? 'Saved in this browser' : 'Add a fictional contact to begin'}</div></div><div className="card stat-card"><div className="eyebrow">Check-in status</div><div className="stat-value" data-testid="status-checkin-dashboard">{active ? 'Active' : state.checkIn?.status === 'overdue' ? 'Overdue' : 'Ready'}</div><div className="stat-note">{active ? 'Only visible in this demo' : 'No external alert is sent'}</div></div></div>
+    </div>
+    <div className="grid grid-3" style={{ marginTop: 18 }}><Link href="/contacts" className="card" data-testid="link-card-contacts"><UsersRound size={19} color="hsl(var(--accent-foreground))" /><h3 className="card-title" style={{ marginTop: 18 }}>Add a trusted contact</h3><p className="card-copy">Keep fictional details here for this presentation.</p><ChevronRight size={17} style={{ marginTop: 18 }} /></Link><Link href="/map" className="card" data-testid="link-card-map"><Map size={19} color="hsl(var(--accent-foreground))" /><h3 className="card-title" style={{ marginTop: 18 }}>Search a map</h3><p className="card-copy">Open an external map search without invented listings.</p><ChevronRight size={17} style={{ marginTop: 18 }} /></Link><Link href="/digital-safety" className="card" data-testid="link-card-digital"><LockKeyhole size={19} color="hsl(var(--accent-foreground))" /><h3 className="card-title" style={{ marginTop: 18 }}>Check digital safety</h3><p className="card-copy">Work through short, practical scenarios.</p><ChevronRight size={17} style={{ marginTop: 18 }} /></Link></div>
+    <div className="notice" style={{ marginTop: 18 }}><Shield size={17} /><span>This is a browser-only presentation demo. It cannot contact emergency services, notify contacts, or provide secure account authorization.</span></div>
+  </>;
 }
 
-function RoutedErrorBoundary({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
+function SOSPage({ flash }: Props) {
+  const [locationText, setLocationText] = useState(''); const [busy, setBusy] = useState(false);
+  const requestLocation = () => {
+    if (!navigator.geolocation) { setLocationText('This browser does not provide geolocation.'); return; }
+    setBusy(true); setLocationText('');
+    navigator.geolocation.getCurrentPosition((position) => { setBusy(false); setLocationText(`Location received for this session: ${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}. It was not stored.`); }, () => { setBusy(false); setLocationText('Location permission was declined or unavailable. No location was stored.'); });
+  };
+  const share = async () => {
+    if (!locationText) { flash('Choose “Get my location” first.'); return; }
+    const text = `My browser session location: ${locationText}`;
+    const shareWithDevice = (navigator as Navigator & { share?: (data: { text: string }) => Promise<void> }).share;
+    try {
+      if (shareWithDevice) {
+        await shareWithDevice.call(navigator, { text });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error('Sharing is not supported by this browser.');
+      }
+      flash('Ready to share or copy — nothing was sent automatically.');
+    } catch (error) {
+      flash(error instanceof Error && error.name === 'AbortError'
+        ? 'Share was cancelled. Nothing was sent.'
+        : 'This browser could not share or copy the text. Nothing was sent.');
+    }
+  };
+  return <><PageHeading eyebrow="Immediate options" title="SOS plan" subtitle="Choose the action yourself. This demo never dispatches help or notifies contacts automatically." /><div className="grid grid-main"><section className="card" style={{ textAlign: 'center' }}><div className="eyebrow">Manual action</div><div className="sos-ring"><a href="tel:112" className="sos-core" data-testid="link-call-emergency">CALL 112</a></div><h2 className="card-title">Call emergency services</h2><p className="card-copy">This opens your device’s phone handler. SheGuard does not place or confirm the call.</p><div style={{ marginTop: 19 }}><a href="tel:112" className="btn btn-danger" data-testid="link-sos-tel"><Phone size={16} /> Call emergency services</a></div></section><section className="card"><div className="eyebrow">Session-only location</div><h2 className="card-title" style={{ marginTop: 10 }}>Choose if location helps</h2><p className="card-copy">A browser permission request happens only after your click. We do not store coordinates or send them to contacts.</p><Button data-testid="button-request-location" className="btn-primary" style={{ marginTop: 20 }} onClick={requestLocation} disabled={busy}>{busy ? 'Requesting permission…' : 'Get my location'}</Button>{locationText && <div className="notice" style={{ marginTop: 14 }} data-testid="status-location"><CheckCircle2 size={16} />{locationText}</div>}<Button data-testid="button-share-location" className="btn-soft" style={{ marginTop: 10 }} onClick={share}><Clipboard size={15} /> Copy or share manually</Button><div className="footer-note" style={{ marginTop: 13 }}>Sharing opens your browser/device share or copies text. It does not send an alert.</div></section></div><div className="notice warning" style={{ marginTop: 18 }}><AlertCircle size={17} /><span><strong>India emergency number:</strong> use the official ERSS information in the Resource guide for context. Call only when you choose to.</span></div></>;
+}
+
+function ContactsPage({ state, setState, flash }: Props) {
+  const empty = { name: '', relationship: '', phone: '', email: '' }; const [form, setForm] = useState(empty); const [editing, setEditing] = useState<string | undefined>(); const [error, setError] = useState('');
+  const save = (event: FormEvent) => { event.preventDefault(); const validation = validateContact(form, state.contacts, editing); if (validation) { setError(validation); return; } const contact: Contact = { ...form, id: editing ?? makeId('contact') }; setState((s) => ({ ...s, contacts: editing ? s.contacts.map((item) => item.id === editing ? contact : item) : [...s.contacts, contact] })); setForm(empty); setEditing(undefined); setError(''); flash(editing ? 'Demo contact updated.' : 'Demo contact added.'); };
+  const edit = (item: Contact) => { setEditing(item.id); setForm({ name: item.name, relationship: item.relationship, phone: item.phone ?? '', email: item.email ?? '' }); setError(''); };
+  const remove = (id: string) => { if (window.confirm('Delete this local demo contact?')) setState((s) => ({ ...s, contacts: s.contacts.filter((item) => item.id !== id) })); };
+  return <><PageHeading eyebrow="Your circle" title="Trusted contacts" subtitle="Store fictional details for the flow you want to present. Nothing is notified automatically." /><DemoNotice /><div className="grid grid-main" style={{ marginTop: 18 }}><section className="card"><div className="eyebrow">{editing ? 'Edit contact' : 'Add contact'}</div><h2 className="card-title" style={{ marginTop: 10 }}>{editing ? 'Update a demo contact' : 'Who would you choose?'}</h2><form onSubmit={save} className="form-grid" style={{ marginTop: 18 }}><div className="field"><label htmlFor="contact-name">Name</label><input data-testid="input-contact-name" id="contact-name" className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Fictional name" /></div><div className="field"><label htmlFor="contact-relationship">Relationship</label><input data-testid="input-contact-relationship" id="contact-relationship" className="input" value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} placeholder="Friend, sibling, neighbour" /></div><div className="grid grid-2"><div className="field"><label htmlFor="contact-phone">Phone</label><input data-testid="input-contact-phone" id="contact-phone" className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91…" /></div><div className="field"><label htmlFor="contact-email">Email</label><input data-testid="input-contact-email" id="contact-email" className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="fictional@example.test" /></div></div>{error && <div className="notice warning" data-testid="status-contact-error"><AlertCircle size={16} />{error}</div>}<div className="row-actions"><Button data-testid="button-save-contact" type="submit" className="btn-primary">{editing ? 'Save changes' : 'Add contact'}</Button>{editing && <Button data-testid="button-cancel-contact-edit" type="button" className="btn-soft" onClick={() => { setEditing(undefined); setForm(empty); }}>Cancel</Button>}</div></form></section><section className="card"><div className="eyebrow">Saved locally</div><h2 className="card-title" style={{ marginTop: 10 }}>Your contacts</h2><div className="list" style={{ marginTop: 17 }}>{state.contacts.length === 0 ? <EmptyState icon={UsersRound} title="No contacts yet">Add fictional details on the left to see the list here.</EmptyState> : state.contacts.map((item) => <div className="list-row" key={item.id} data-testid={`row-contact-${item.id}`}><div style={{ display: 'flex', gap: 11, alignItems: 'center', minWidth: 0 }}><div className="avatar">{initials(item.name)}</div><div><strong style={{ display: 'block' }}>{item.name}</strong><span className="footer-note">{item.relationship} · {item.phone || item.email}</span></div></div><div className="row-actions"><Button data-testid={`button-edit-contact-${item.id}`} className="icon-btn" onClick={() => edit(item)} aria-label={`Edit ${item.name}`}><Pencil size={15} /></Button><Button data-testid={`button-delete-contact-${item.id}`} className="icon-btn" onClick={() => remove(item.id)} aria-label={`Delete ${item.name}`}><Trash2 size={15} /></Button></div></div>)}</div></section></div></>;
+}
+
+function CheckInPage({ state, setState, flash }: Props) {
+  const [, rerender] = useState(0); const [minutes, setMinutes] = useState('30');
+  useEffect(() => { const id = window.setInterval(() => rerender((n) => n + 1), 1000); return () => window.clearInterval(id); }, []);
+  const check = state.checkIn; const status = check?.status === 'active' && check.deadline <= Date.now() ? 'overdue' : check?.status;
+  const remaining = check && status === 'active' ? Math.max(0, check.deadline - Date.now()) : 0; const timer = `${String(Math.floor(remaining / 60000)).padStart(2, '0')}:${String(Math.floor(remaining / 1000) % 60).padStart(2, '0')}`;
+  useEffect(() => { if (status === 'overdue' && check?.status === 'active') setState((s) => s.checkIn ? ({ ...s, checkIn: { ...s.checkIn, status: 'overdue' } }) : s); }, [status, check?.status, setState]);
+  const start = () => setState((s) => ({ ...s, checkIn: { deadline: Date.now() + Number(minutes) * 60000, status: 'active' } }));
+  return <><PageHeading eyebrow="A gentle timer" title="Safety check-in" subtitle="A visible countdown for a plan you set yourself. It does not call, message, or alert anyone." /><div className="grid grid-main"><section className="card" style={{ textAlign: 'center' }}><div className="eyebrow">{status === 'active' ? 'In progress' : status === 'overdue' ? 'Time passed' : 'Ready when you are'}</div>{status === 'active' ? <><div className="timer" style={{ margin: '24px 0 8px' }} data-testid="text-checkin-countdown">{timer}</div><p className="card-copy">Only this browser shows this countdown.</p><div className="row-actions" style={{ justifyContent: 'center', marginTop: 20 }}><Button data-testid="button-complete-checkin" className="btn-primary" onClick={() => { setState((s) => s.checkIn ? ({ ...s, checkIn: { ...s.checkIn, status: 'completed' } }) : s); flash('Check-in marked complete locally.'); }}><Check size={15} /> Mark complete</Button><Button data-testid="button-cancel-checkin" className="btn-soft" onClick={() => setState((s) => s.checkIn ? ({ ...s, checkIn: { ...s.checkIn, status: 'cancelled' } }) : s)}>Cancel</Button></div></> : <><div style={{ margin: '28px 0 8px' }}><CalendarClock size={38} color="hsl(var(--accent-foreground))" /></div><p className="card-copy">{status === 'overdue' ? 'This check-in passed without an external alert.' : check?.status === 'completed' ? 'Completed locally. Start another whenever useful.' : 'Choose a duration and start a local countdown.'}</p><div className="row-actions" style={{ justifyContent: 'center', marginTop: 20 }}><select data-testid="select-checkin-duration" className="select" style={{ width: 145 }} value={minutes} onChange={(e) => setMinutes(e.target.value)}><option value="5">5 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option><option value="120">2 hours</option></select><Button data-testid="button-start-checkin" className="btn-primary" onClick={start}>Start check-in</Button></div></>}</section><section className="card"><div className="eyebrow">What this can do</div><h2 className="card-title" style={{ marginTop: 10 }}>Clear boundaries matter</h2><div className="list" style={{ marginTop: 20 }}><div className="list-row"><CheckCircle2 size={18} color="hsl(153 47% 37%)" /><span style={{ fontSize: 13 }}>Shows the timer and status in this browser</span></div><div className="list-row"><X size={18} color="hsl(var(--destructive))" /><span style={{ fontSize: 13 }}>Does not contact your trusted contacts</span></div><div className="list-row"><X size={18} color="hsl(var(--destructive))" /><span style={{ fontSize: 13 }}>Does not notify emergency services</span></div></div></section></div></>;
+}
+
+function MapPage() {
+  const categories = ['Hospitals near me', 'Police stations near me', 'Pharmacies near me', 'Women support services near me'];
+  const openSearch = (category: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(category)}`;
+  return <><PageHeading eyebrow="No invented listings" title="Safety map" subtitle="Choose a category to open an external map search. Results, distance, hours, and availability come from that map provider." /><div className="notice warning"><Map size={17} /><span>SheGuard does not know your location here and does not create place listings. Your browser may use location only if the external map asks you.</span></div><div className="grid grid-2" style={{ marginTop: 18 }}>{categories.map((category, index) => <div className="card" key={category}><div className="module-icon">{index === 0 ? <HeartHandshake size={19} /> : index === 1 ? <Shield size={19} /> : <Map size={19} />}</div><h2 className="card-title" style={{ marginTop: 17 }}>{category}</h2><p className="card-copy">Open a new search and check the current results yourself.</p><a data-testid={`link-map-search-${index}`} className="btn btn-soft" style={{ marginTop: 19 }} target="_blank" rel="noreferrer" href={openSearch(category)}>Open map search <ExternalLink size={14} /></a></div>)}</div></>;
+}
+
+function ResourcesPage() {
+  const [query, setQuery] = useState(''); const [kind, setKind] = useState('All');
+  const kinds = ['All', ...new Set(resourceEntries.map((item) => item.kind))]; const filtered = resourceEntries.filter((item) => (kind === 'All' || item.kind === kind) && `${item.title} ${item.description} ${item.source}`.toLowerCase().includes(query.toLowerCase()));
+  return <><PageHeading eyebrow="Source-linked, India" title="Resource guide" subtitle="Official links are labelled with their source and jurisdiction. Read the source itself before making decisions." /><DemoNotice>Emergency details are for orientation. Use manual links only; SheGuard does not call, message, or confirm a connection.</DemoNotice><div className="page-tabs" style={{ marginTop: 22 }}>{kinds.map((item) => <button key={item} data-testid={`button-resource-filter-${item.toLowerCase().replaceAll(' ', '-')}`} className={`page-tab ${kind === item ? 'active' : ''}`} onClick={() => setKind(item)}>{item}</button>)}</div><div className="field" style={{ maxWidth: 560, marginBottom: 18 }}><label htmlFor="resource-search">Search resources</label><div style={{ position: 'relative' }}><Search size={16} style={{ position: 'absolute', left: 13, top: 14, color: 'hsl(var(--muted-foreground))' }} /><input data-testid="input-resource-search" id="resource-search" className="input" style={{ paddingLeft: 38 }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Try emergency, cyber, helpline…" /></div></div><div className="grid grid-2">{filtered.length ? filtered.map((resource) => <article className="card" key={resource.id} data-testid={`card-resource-${resource.id}`}><span className="pill rose">{resource.kind}</span><h2 className="card-title" style={{ marginTop: 15 }}>{resource.title}</h2><p className="card-copy">{resource.description}</p><div className="footer-note" style={{ marginTop: 16 }}>{resource.source} · India jurisdiction</div>{resource.url ? <a data-testid={`link-resource-${resource.id}`} className="source-link" style={{ display: 'inline-flex', marginTop: 15, gap: 6 }} href={resource.url} target="_blank" rel="noreferrer">Open official source <ExternalLink size={13} /></a> : <div className="footer-note" style={{ marginTop: 15 }}>No official source link attached to this demo item.</div>}{resource.id === 'res-1' && <div className="row-actions" style={{ marginTop: 14 }}><a className="btn btn-danger btn-small" data-testid="link-resource-call-112" href="tel:112"><Phone size={13} /> Call 112 manually</a></div>}{resource.id === 'res-2' && <div className="row-actions" style={{ marginTop: 14 }}><a className="btn btn-soft btn-small" data-testid="link-resource-call-181" href="tel:181"><Phone size={13} /> Call 181 manually</a><a className="btn btn-soft btn-small" data-testid="link-resource-call-1930" href="tel:1930"><Phone size={13} /> Call 1930 manually</a></div>}{resource.id === 'res-3' && <div className="row-actions" style={{ marginTop: 14 }}><a className="btn btn-soft btn-small" data-testid="link-resource-call-1930-cyber" href="tel:1930"><Phone size={13} /> Call 1930 manually</a></div>}</article>) : <EmptyState icon={Search} title="No matching resources">Try a different word or category.</EmptyState>}</div></>;
+}
+
+function RightsPage() {
+  const topics = [{ title: 'Understanding consent', copy: 'Consent should be voluntary, informed, and can be changed. This is general educational information, not legal advice.' }, { title: 'Reporting and support', copy: 'Official channels and local services can differ by situation and jurisdiction. Use the linked government sources in the Resource guide to verify current guidance.' }, { title: 'Workplace and public spaces', copy: 'Keep records and seek qualified, local support when you need to understand a specific process. SheGuard cannot assess a case.' }];
+  return <><PageHeading eyebrow="Plain-language orientation" title="Know your rights" subtitle="Start a conversation with reliable information, then verify details for your state, situation, and current law." /><div className="notice warning"><ShieldCheck size={17} /><span>India jurisdiction. This page is general education, not legal advice. It does not state a complete set of rights and cannot replace a qualified professional or official source.</span></div><div className="grid grid-3" style={{ marginTop: 18 }}>{topics.map((topic, index) => <article className="card" key={topic.title}><div className="module-icon"><ShieldCheck size={18} /></div><div className="eyebrow" style={{ marginTop: 18 }}>Topic 0{index + 1}</div><h2 className="card-title" style={{ marginTop: 9 }}>{topic.title}</h2><p className="card-copy">{topic.copy}</p><Link data-testid={`link-rights-resource-${index}`} href="/resources" className="btn btn-soft" style={{ marginTop: 20 }}>See official sources <ArrowRight size={14} /></Link></article>)}</div></>;
+}
+
+const scenarios = [
+  { title: 'A new app asks for continuous location access.', choices: ['Allow it without checking', 'Review whether it needs access and choose a narrower setting', 'Share your password instead'], answer: 1, explanation: 'Review the purpose and use the narrowest permission that works for you.' },
+  { title: 'You are using a shared computer to sign in.', choices: ['Sign out and avoid saving the password', 'Leave the tab open', 'Use the same password everywhere'], answer: 0, explanation: 'Sign out, do not save credentials, and use a private window when available.' },
+  { title: 'A message asks for a one-time code urgently.', choices: ['Send the code quickly', 'Pause, verify through a separate trusted channel', 'Post it in a group for advice'], answer: 1, explanation: 'Treat unexpected code requests as suspicious and verify independently.' },
+];
+function DigitalSafetyPage() {
+  const [step, setStep] = useState(0); const [selected, setSelected] = useState<number | null>(null); const [done, setDone] = useState<number[]>([]);
+  const scenario = scenarios[step]; const choose = (index: number) => { setSelected(index); if (!done.includes(step)) setDone([...done, step]); };
+  const next = () => { setStep((step + 1) % scenarios.length); setSelected(null); };
+  return <><PageHeading eyebrow="Practice, don't panic" title="Digital safety" subtitle="Work through short situations and choose the action that keeps control with you." /><div className="grid grid-main"><section className="card"><div style={{ display: 'flex', justifyContent: 'space-between', gap: 15 }}><div className="eyebrow">Scenario {step + 1} of {scenarios.length}</div><span className="pill">{done.length} completed</span></div><div className="progress" style={{ marginTop: 13 }}><span style={{ width: `${(done.length / scenarios.length) * 100}%` }} /></div><div className="question">{scenario.title}</div>{scenario.choices.map((choice, index) => <button key={choice} data-testid={`button-scenario-choice-${index}`} className={`choice ${selected === index ? (index === scenario.answer ? 'correct' : 'wrong') : ''}`} onClick={() => choose(index)}><span>{choice}</span>{selected === index && (index === scenario.answer ? <CheckCircle2 size={17} /> : <X size={17} />)}</button>)}{selected !== null && <div className="notice" style={{ marginTop: 17 }} data-testid="status-scenario-answer"><CheckCircle2 size={16} /><span>{selected === scenario.answer ? 'Good choice. ' : 'Consider another approach. '}{scenario.explanation}</span></div>}<Button data-testid="button-next-scenario" className="btn-primary" style={{ marginTop: 18 }} onClick={next}>Next scenario <ArrowRight size={14} /></Button></section><section className="card soft"><div className="module-icon"><LockKeyhole size={19} /></div><h2 className="card-title" style={{ marginTop: 18 }}>Three useful habits</h2><div className="list" style={{ marginTop: 15 }}><p className="card-copy">Review app permissions every so often.</p><p className="card-copy">Use unique passwords and a second factor where available.</p><p className="card-copy">Pause before sharing a code, photo, or location.</p></div><div className="footer-note" style={{ marginTop: 20 }}>General education only — not security or professional advice.</div></section></div></>;
+}
+
+const modules = [{ id: 'module-plan', title: 'Make a small plan', description: 'Choose a route, a check-in time, and one backup option.' }, { id: 'module-boundaries', title: 'Practice a boundary', description: 'Write one sentence that gives you room to pause or say no.' }, { id: 'module-digital', title: 'Review your digital doors', description: 'Look at permissions, sign-ins, and passwords on one device.' }, { id: 'module-support', title: 'Name your support', description: 'Think about who you would contact for practical help.' }];
+function EmpowermentPage({ state, setState, flash }: Props) {
+  const completed = state.completedModuleIds; const toggle = (id: string) => setState((s) => ({ ...s, completedModuleIds: s.completedModuleIds.includes(id) ? s.completedModuleIds.filter((item) => item !== id) : [...s.completedModuleIds, id] }));
+  return <><PageHeading eyebrow="Learn at your pace" title="Empowerment" subtitle="Short modules for building confidence through practical choices. Completion stays in this browser." /><div className="card soft" style={{ marginBottom: 18 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 15 }}><div><div className="eyebrow">Your progress</div><h2 className="card-title" style={{ marginTop: 9 }}>{completed.length} of {modules.length} modules complete</h2></div><HeartHandshake size={28} color="hsl(var(--accent-foreground))" /></div><div className="progress" style={{ marginTop: 17 }}><span style={{ width: `${completed.length / modules.length * 100}%` }} /></div></div><div className="list">{modules.map((module) => { const isDone = completed.includes(module.id); return <article className="card module-card" key={module.id} data-testid={`card-module-${module.id}`}><div className="module-icon">{isDone ? <Check size={19} /> : <HeartHandshake size={19} />}</div><div><div className="eyebrow">{isDone ? 'Complete' : 'Module'}</div><h2 className="card-title" style={{ marginTop: 7 }}>{module.title}</h2><p className="card-copy">{module.description}</p></div><Button data-testid={`button-toggle-module-${module.id}`} className={isDone ? 'btn-soft' : 'btn-primary'} onClick={() => { toggle(module.id); flash(isDone ? 'Module marked incomplete.' : 'Module completed locally.'); }}>{isDone ? 'Undo' : 'Mark complete'}</Button></article>; })}</div></>;
+}
+
+function CommunityPage({ state, setState, flash }: Props) {
+  const [topic, setTopic] = useState('Planning'); const [body, setBody] = useState(''); const [error, setError] = useState('');
+  const visible = state.posts.filter((post) => !state.blockedAuthorIds.includes(post.author)); const own = (post: CommunityPost) => post.author === 'You';
+  const create = (event: FormEvent) => { event.preventDefault(); if (body.trim().length < 8) { setError('Write at least a few words so the post is useful.'); return; } const post: CommunityPost = { id: makeId('post'), author: 'You', topic, body: body.trim(), createdAt: Date.now() }; setState((s) => ({ ...s, posts: [post, ...s.posts] })); setBody(''); setError(''); flash('Post added to your local demo community.'); };
+  const report = (postId: string) => { if (window.confirm('Report this post for local admin review?')) { setState((s) => ({ ...s, reports: [...s.reports, { id: makeId('report'), postId, reason: 'User reported post', status: 'open' }] })); flash('Report saved locally for the admin demo.'); } };
+  const remove = (id: string) => { if (window.confirm('Delete your local demo post?')) setState((s) => ({ ...s, posts: s.posts.filter((post) => post.id !== id) })); };
+  return <><PageHeading eyebrow="A moderated demo space" title="Community" subtitle="Share practical ideas without sharing personal or identifying details. Posts and reports exist only in this browser." /><DemoNotice /><div className="grid grid-main" style={{ marginTop: 18 }}><section className="card"><div className="eyebrow">New local post</div><form onSubmit={create} className="form-grid" style={{ marginTop: 16 }}><div className="field"><label htmlFor="post-topic">Topic</label><select data-testid="select-post-topic" id="post-topic" className="select" value={topic} onChange={(e) => setTopic(e.target.value)}><option>Planning</option><option>Digital safety</option><option>Boundaries</option><option>Encouragement</option></select></div><div className="field"><label htmlFor="post-body">Your note</label><textarea data-testid="textarea-post-body" id="post-body" className="textarea" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Share a practical, non-identifying idea…" /></div>{error && <div className="notice warning" data-testid="status-post-error"><AlertCircle size={16} />{error}</div>}<Button data-testid="button-create-post" type="submit" className="btn-primary"><Plus size={15} /> Publish locally</Button></form></section><section><div className="list">{visible.length ? visible.map((post) => <article className="card" key={post.id} data-testid={`card-post-${post.id}`}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 15 }}><div><span className="pill rose">{post.topic}</span><h2 className="card-title" style={{ marginTop: 13 }}>{post.author}</h2></div><span className="footer-note">{formatDate(post.createdAt)}</span></div><p className="card-copy" style={{ marginTop: 11 }}>{post.body}</p><div className="row-actions" style={{ marginTop: 17 }}><Button data-testid={`button-block-post-author-${post.id}`} className="btn-soft btn-small" onClick={() => { setState((s) => ({ ...s, blockedAuthorIds: [...new Set([...s.blockedAuthorIds, post.author])] })); flash('Author hidden in this local demo.'); }}><Ban size={14} /> Block author</Button>{own(post) ? <Button data-testid={`button-delete-post-${post.id}`} className="btn-ghost btn-small" onClick={() => remove(post.id)}><Trash2 size={14} /> Delete</Button> : <Button data-testid={`button-report-post-${post.id}`} className="btn-ghost btn-small" onClick={() => report(post.id)}>Report</Button>}</div></article>) : <EmptyState icon={UsersRound} title="No visible posts">Blocked authors are hidden from your local view.</EmptyState>}</div></section></div></>;
+}
+
+function AssistantPage() {
+  const [query, setQuery] = useState(''); const matches = guideEntries.filter((entry) => `${entry.q} ${entry.title} ${entry.answer} ${entry.tags}`.toLowerCase().includes(query.toLowerCase()));
+  return <><PageHeading eyebrow="Built in, not live" title="SheGuide" subtitle="Search a small set of written guidance. It is deterministic, not an AI service, and not professional advice." /><div className="card" style={{ maxWidth: 760 }}><div className="field"><label htmlFor="guide-search">What do you want to understand?</label><div style={{ position: 'relative' }}><Search size={16} style={{ position: 'absolute', left: 13, top: 14 }} /><input data-testid="input-guide-search" id="guide-search" className="input" style={{ paddingLeft: 38 }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Try “emergency”, “location”, or “rights”" /></div></div><div className="list" style={{ marginTop: 20 }}>{matches.length ? matches.map((entry) => <article className="list-row" style={{ display: 'block' }} key={entry.q} data-testid={`card-guide-${entry.q.replaceAll(' ', '-')}`}><div className="eyebrow" style={{ color: 'hsl(var(--accent-foreground))' }}>{entry.title}</div><p className="card-copy" style={{ marginTop: 8 }}>{entry.answer}</p></article>) : <EmptyState icon={Search} title="No guide entry matches that">Try a simpler word or open the Resource guide.</EmptyState>}</div></div><div className="notice warning" style={{ maxWidth: 760, marginTop: 18 }}><Siren size={17} /><span>For immediate danger, call 112 yourself. This guide cannot contact anyone and does not know your situation.</span></div></>;
+}
+
+function AdminPage({ state, setState, flash }: Props) {
+  if (state.session?.role !== 'admin') return <><PageHeading eyebrow="Presentation-only gate" title="Admin review" subtitle="This view is available only after entering the admin demo account." /><div className="card"><div className="notice warning"><LockKeyhole size={17} /><span>This is not secure role authorization. Sign out and use admin@sheguard.test / Admin@12345 to view the local review tools.</span></div></div></>;
+  const update = (id: string, status: LocalReport['status']) => { setState((s) => ({ ...s, reports: s.reports.map((report) => report.id === id ? { ...report, status } : report) })); flash(`Report marked ${status} in this local demo.`); };
+  return <><PageHeading eyebrow="Local moderation" title="Admin review" subtitle="Presentation-only review of reports created in this browser. There is no backend or secure authorization." /><div className="notice warning"><Settings2 size={17} /><span>Admin gating is a UI demonstration. It does not protect real data or grant real moderation authority.</span></div><div className="grid grid-main" style={{ marginTop: 18 }}><section className="card"><div className="eyebrow">Reports</div><h2 className="card-title" style={{ marginTop: 9 }}>{state.reports.length} locally stored</h2><div className="list" style={{ marginTop: 17 }}>{state.reports.length ? state.reports.map((report) => <div className="list-row" key={report.id} data-testid={`row-report-${report.id}`}><div><strong>{report.reason}</strong><div className="footer-note">Post ID: {report.postId} · {report.status}</div></div><div className="row-actions"><Button data-testid={`button-review-report-${report.id}`} className="btn-soft btn-small" onClick={() => update(report.id, 'reviewed')}>Review</Button><Button data-testid={`button-dismiss-report-${report.id}`} className="btn-ghost btn-small" onClick={() => update(report.id, 'dismissed')}>Dismiss</Button></div></div>) : <EmptyState icon={Clipboard} title="No reports">Reports made in Community appear here for this demo session.</EmptyState>}</div></section><section className="card soft"><div className="eyebrow">Demo catalogue</div><h2 className="card-title" style={{ marginTop: 9 }}>Resource links</h2><p className="card-copy">The built-in resource set includes only supplied official sources and clearly labelled demo guidance.</p><div className="list" style={{ marginTop: 15 }}>{resourceEntries.map((item) => <div className="list-row" key={item.id}><span style={{ fontSize: 12, fontWeight: 700 }}>{item.title}</span>{item.url ? <CheckCircle2 size={16} color="hsl(153 47% 37%)" /> : <span className="pill">Demo text</span>}</div>)}</div></section></div></>;
+}
+
+function PrivacyPage({ state, setState, flash, clearData }: Props) {
+  const exportData = () => { const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'sheguard-demo-data.json'; anchor.click(); URL.revokeObjectURL(url); flash('Demo JSON export prepared.'); };
+  const clear = () => { if (!window.confirm('Clear all locally stored SheGuard demo data from this browser?')) return; if (clearData) clearData(); else { clearDemoState(); setState({ ...initialState, posts: [] }); } flash('Local demo data cleared. No account was deleted.'); };
+  return <><PageHeading eyebrow="Your browser, your control" title="Privacy & demo data" subtitle="See what this presentation build can do, what it cannot do, and remove its local records." /><div className="grid grid-2"><section className="card"><div className="module-icon"><LockKeyhole size={19} /></div><h2 className="card-title" style={{ marginTop: 18 }}>What is stored locally</h2><p className="card-copy">Demo session, fictional contacts, timer state, module completion, community posts and reports, theme, language, and blocked authors may be stored in localStorage.</p><Button data-testid="button-export-data" className="btn-soft" style={{ marginTop: 20 }} onClick={exportData}><FileDown size={15} /> Export demo JSON</Button></section><section className="card"><div className="module-icon"><Trash2 size={19} /></div><h2 className="card-title" style={{ marginTop: 18 }}>Clear this browser</h2><p className="card-copy">Clearing removes this presentation data from this browser. It does not delete an account because no real account or backend exists.</p><Button data-testid="button-clear-data" className="btn-danger" style={{ marginTop: 20 }} onClick={clear}>Clear local demo data</Button></section></div><div className="notice" style={{ marginTop: 18 }}><Info size={17} /><span>Location is not stored by this app. Browser or external map providers may handle location under their own permissions and policies.</span></div></>;
 }
 
 function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
+  const [state, setState] = useState<DemoState>(() => readDemoState()); const [toast, setToast] = useState(''); const skipPersist = useRef(false);
+  useEffect(() => { document.documentElement.classList.toggle('dark', state.theme === 'dark'); }, [state.theme]);
+  useEffect(() => { if (skipPersist.current) { skipPersist.current = false; return; } try { localStorage.setItem('sheguard-demo-v1', JSON.stringify(state)); } catch { setToast('Browser storage is unavailable; this demo may not persist changes.'); } }, [state]);
+  useEffect(() => {
+    if (!toast) return undefined;
+    const id = window.setTimeout(() => setToast(''), 3300);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+  const flash = (message: string) => setToast(message);
+  const clearData = () => { skipPersist.current = true; clearDemoState(); setState({ ...initialState, posts: [] }); };
+  const props = { state, setState, flash, clearData };
+  const session = state.session;
+  return <>{!session ? <Switch><Route path="/login"><Login setState={setState} flash={flash} /></Route><Route path="/"><Login setState={setState} flash={flash} /></Route><Route><Login setState={setState} flash={flash} /></Route></Switch> : <Shell {...props}><Switch>
+    <Route path="/"><Dashboard {...props} /></Route><Route path="/dashboard"><Dashboard {...props} /></Route><Route path="/sos"><SOSPage {...props} /></Route><Route path="/contacts"><ContactsPage {...props} /></Route><Route path="/check-in"><CheckInPage {...props} /></Route><Route path="/map"><MapPage /></Route><Route path="/resources"><ResourcesPage /></Route><Route path="/rights"><RightsPage /></Route><Route path="/digital-safety"><DigitalSafetyPage /></Route><Route path="/empowerment"><EmpowermentPage {...props} /></Route><Route path="/community"><CommunityPage {...props} /></Route><Route path="/assistant"><AssistantPage /></Route><Route path="/privacy"><PrivacyPage {...props} /></Route><Route path="/admin"><AdminPage {...props} /></Route><Route><Dashboard {...props} /></Route>
+  </Switch></Shell>}{toast && <div className="toast" role="status" data-testid="status-toast">{toast}</div>}</>;
 }
 
 export default App;
