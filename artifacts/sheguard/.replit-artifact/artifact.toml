@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "SheGuard"
+description = "A calm, privacy-minded safety and empowerment platform for women, with trusted contacts, deliberate check-ins, safety education, and an honest demo experience."
+version = "1.0.0"
+id = "artifacts/sheguard"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18912
+
+[services.development]
+run = "pnpm --filter @workspace/sheguard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/sheguard", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/sheguard/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18912"
+BASE_PATH = "/"
