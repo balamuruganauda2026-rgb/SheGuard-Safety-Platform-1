@@ -3,8 +3,9 @@ import { Link, Route, Switch, useLocation } from 'wouter';
 import {
   AlertCircle, ArrowRight, BookOpen, CalendarClock, Check, CheckCircle2, ChevronRight,
   CircleHelp, Clipboard, Clock3, ExternalLink, FileDown, HeartHandshake, House,
-  Info, LockKeyhole, LogOut, Map, Menu, Moon, Pencil, Phone, Plus, Search,
-  Settings2, Shield, ShieldCheck, Siren, Sun, Trash2, UsersRound, X, Ban,
+  Info, LockKeyhole, LogOut, Map, Menu, MessageCircle, Moon, Pencil, Phone, Plus,
+  Search, Send, Settings2, Shield, ShieldCheck, Siren, Sparkles, Sun, Trash2,
+  UsersRound, X, Ban, RotateCcw,
 } from 'lucide-react';
 import {
   clearDemoState, demoCredentials, guideEntries, initialState, makeId, readDemoState,
@@ -27,7 +28,7 @@ const navItems: { href: string; label: string; icon: Icon }[] = [
   { href: '/digital-safety', label: 'Digital safety', icon: LockKeyhole },
   { href: '/empowerment', label: 'Empowerment', icon: HeartHandshake },
   { href: '/community', label: 'Community', icon: UsersRound },
-  { href: '/assistant', label: 'SheGuide', icon: CircleHelp },
+  { href: '/assistant', label: 'Ask Guardian', icon: CircleHelp },
   { href: '/privacy', label: 'Privacy & demo data', icon: LockKeyhole },
 ];
 
@@ -44,6 +45,123 @@ function DemoNotice({ children = 'Presentation demo — information and actions 
 }
 function EmptyState({ icon: IconComp, title, children }: { icon: Icon; title: string; children: ReactNode }) {
   return <div className="empty"><IconComp size={27} /><strong>{title}</strong><div style={{ marginTop: 6, fontSize: 12 }}>{children}</div></div>;
+}
+
+type GuardianMessage = { id: string; role: 'user' | 'assistant'; content: string; createdAt: number };
+const GUARDIAN_STORAGE_KEY = 'sheguard-guardian-chat-v1';
+const guardianWelcome: GuardianMessage = {
+  id: 'guardian-welcome',
+  role: 'assistant',
+  content: 'Hi, I’m Guardian. I can help you find the next step in this SheGuard demo. I cannot call services, notify contacts, or share your location for you. What would be useful right now?',
+  createdAt: 0,
+};
+const guardianFallback = (input: string) => {
+  const normalized = input.toLowerCase();
+  if (/\b(urgent|danger|unsafe|emergency|help me now|attack)\b/.test(normalized)) return 'If you are in immediate danger, move toward a populated, safer place if you can and call 112 yourself. Open the SOS plan for the manual call link. SheGuard cannot dispatch help or contact anyone.';
+  if (/\b(check[\s-]?in|timer|journey|arrive)\b/.test(normalized)) return 'Safety check-in shows a local countdown in this browser. It does not call, message, or alert anyone when time passes.';
+  if (/\b(location|share|coordinates|where am i)\b/.test(normalized)) return 'The SOS plan can request location for this browser session after you choose it. You can copy or share the result manually; this app does not store or send it.';
+  if (/\b(cyber|digital|password|code|account|privacy)\b/.test(normalized)) return 'Open Digital safety for practice scenarios, or Resource guide for the official cybercrime portal. Do not share passwords or one-time codes.';
+  if (/\b(rights|legal|law|consent|report)\b/.test(normalized)) return 'Open Know your rights for general orientation and Resource guide for official India sources. This app cannot assess a case or provide legal advice.';
+  return 'I can help you find SOS plan, Safety check-in, Trusted contacts, Safety map, Resource guide, rights, or Digital safety. I cannot contact services, notify contacts, store location, or confirm that an action happened.';
+};
+function readGuardianHistory(): GuardianMessage[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(GUARDIAN_STORAGE_KEY) ?? '[]') as GuardianMessage[];
+    return Array.isArray(parsed) && parsed.every((item) => item && (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string')
+      ? parsed.slice(-30)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function GuardianChat({ location }: { location: string }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<GuardianMessage[]>(() => readGuardianHistory());
+  const [input, setInput] = useState('');
+  const [pending, setPending] = useState(false);
+  const [status, setStatus] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const visibleMessages = messages.length ? messages : [guardianWelcome];
+  const quickActions = [
+    { href: '/sos', label: 'Open SOS plan' },
+    { href: '/resources', label: 'Find official resources' },
+    { href: '/check-in', label: 'Set a check-in' },
+  ];
+
+  useEffect(() => {
+    if (messages.length) localStorage.setItem(GUARDIAN_STORAGE_KEY, JSON.stringify(messages.slice(-30)));
+  }, [messages]);
+  useEffect(() => {
+    if (open) window.setTimeout(() => inputRef.current?.focus(), 50);
+  }, [open]);
+
+  const requestReply = async (history: GuardianMessage[], userText: string) => {
+    try {
+      const response = await fetch('/api/guardian', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: history.slice(-16).map(({ role, content }) => ({ role, content })),
+          context: { route: location },
+        }),
+      });
+      if (!response.ok) throw new Error('Guardian request failed');
+      const result = await response.json() as { reply?: string; mode?: 'ai' | 'fallback' };
+      if (!result.reply) throw new Error('Guardian response was empty');
+      setStatus(result.mode === 'fallback' ? 'Using built-in guidance while live AI is unavailable.' : '');
+      return result.reply;
+    } catch {
+      setStatus('Live AI is unavailable. Built-in guidance is still available.');
+      return guardianFallback(userText);
+    }
+  };
+
+  const send = async (event?: FormEvent, preset?: string) => {
+    event?.preventDefault();
+    const userText = (preset ?? input).trim();
+    if (!userText || pending) return;
+    const userMessage: GuardianMessage = { id: makeId('guardian-user'), role: 'user', content: userText, createdAt: Date.now() };
+    const next = [...messages.filter((message) => message.id !== guardianWelcome.id), userMessage];
+    setMessages(next);
+    setInput('');
+    setPending(true);
+    const reply = await requestReply(next, userText);
+    setMessages([...next, { id: makeId('guardian-assistant'), role: 'assistant', content: reply, createdAt: Date.now() }]);
+    setPending(false);
+  };
+  const retry = async () => {
+    const lastUserIndex = [...messages].map((message) => message.role).lastIndexOf('user');
+    const lastUser = lastUserIndex >= 0 ? messages[lastUserIndex] : undefined;
+    if (!lastUser || pending) return;
+    const history = messages.slice(0, lastUserIndex + 1);
+    setMessages(history);
+    setPending(true);
+    const reply = await requestReply(history, lastUser.content);
+    setMessages([...history, { id: makeId('guardian-assistant'), role: 'assistant', content: reply, createdAt: Date.now() }]);
+    setPending(false);
+  };
+
+  return <div className={`guardian ${open ? 'is-open' : ''}`}>
+    {open && <section className="guardian-panel" role="dialog" aria-label="Ask Guardian chat">
+      <header className="guardian-header">
+        <div className="guardian-heading"><div className="guardian-icon"><Sparkles size={17} /></div><div><strong>Ask Guardian</strong><span>Practical guidance for this demo</span></div></div>
+        <Button className="icon-btn guardian-close" onClick={() => setOpen(false)} aria-label="Close Ask Guardian"><X size={17} /></Button>
+      </header>
+      <div className="guardian-boundary"><ShieldCheck size={14} /> Guardian cannot call, alert contacts, or share location for you.</div>
+      <div className="guardian-messages" aria-live="polite">
+        {visibleMessages.map((message) => <div className={`guardian-message ${message.role}`} key={message.id}>{message.content}</div>)}
+        {pending && <div className="guardian-message assistant guardian-typing">Guardian is thinking…</div>}
+      </div>
+      <div className="guardian-actions">{quickActions.map((action) => <Link key={action.href} href={action.href} className="guardian-action" onClick={() => setOpen(false)}>{action.label}<ArrowRight size={12} /></Link>)}</div>
+      {status && <div className="guardian-status" role="status">{status}<Button className="btn-ghost btn-small" onClick={retry}><RotateCcw size={12} /> Retry</Button></div>}
+      <form className="guardian-composer" onSubmit={(event) => void send(event)}>
+        <input ref={inputRef} className="input" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask about your next step…" aria-label="Message Guardian" maxLength={500} />
+        <Button type="submit" className="btn-primary icon-btn" disabled={pending || !input.trim()} aria-label="Send message"><Send size={15} /></Button>
+      </form>
+    </section>}
+    <Button className="guardian-launcher" onClick={() => setOpen(!open)} aria-label={open ? 'Close Ask Guardian' : 'Open Ask Guardian'} aria-expanded={open} data-testid="button-guardian-launcher"><MessageCircle size={20} /><span>Ask Guardian</span></Button>
+  </div>;
 }
 
 function Login({ setState, flash }: Pick<Props, 'setState' | 'flash'>) {
@@ -104,6 +222,7 @@ function Shell({ children, state, setState, flash }: Props & { children: ReactNo
       <div className="demo-strip" data-testid="status-demo-warning">Presentation demo · data stays in this browser · use fictional contact details only</div>
       {mobileOpen && <div style={{ padding: 12, background: 'hsl(var(--sidebar))', display: 'grid', gap: 3 }}>{navItems.map(({ href, label, icon: NavIcon }) => <Link onClick={() => setMobileOpen(false)} key={href} href={href} className="nav-item" data-testid={`link-mobile-${href.slice(1)}`}><NavIcon size={16} />{displayLabel(label)}</Link>)}{state.session?.role === 'admin' && <Link onClick={() => setMobileOpen(false)} href="/admin" className="nav-item" data-testid="link-mobile-admin"><Settings2 size={16} />Admin review</Link>}</div>}
       <main className="content">{children}</main>
+      <GuardianChat location={location} />
     </div>
   </div>;
 }
@@ -111,7 +230,7 @@ function Shell({ children, state, setState, flash }: Props & { children: ReactNo
 function Dashboard({ state }: Props) {
   const active = state.checkIn?.status === 'active' && state.checkIn.deadline > Date.now();
   return <><PageHeading eyebrow="Good to see you" title="Welcome back 👋" subtitle="A quiet place to prepare, check in, and find the next useful step." action={<Link href="/sos" className="btn btn-danger" data-testid="link-dashboard-sos"><Siren size={16} /> Open SOS plan</Link>} />
-    <div className="grid grid-main"><section className="hero-panel"><div className="eyebrow" style={{ color: 'hsl(var(--accent))' }}>Today, on your terms</div><h2>Small plans can create more room to breathe.</h2><p>Start with one trusted contact, a timed check-in, or a resource you want to understand better.</p><div className="row-actions"><Link href="/check-in" className="btn btn-accent" data-testid="link-dashboard-checkin">Set a check-in <ArrowRight size={15} /></Link><Link href="/assistant" className="btn btn-ghost" style={{ color: 'inherit' }} data-testid="link-dashboard-guide">Ask SheGuide</Link></div></section>
+     <div className="grid grid-main"><section className="hero-panel"><div className="eyebrow" style={{ color: 'hsl(var(--accent))' }}>Today, on your terms</div><h2>Small plans can create more room to breathe.</h2><p>Start with one trusted contact, a timed check-in, or a resource you want to understand better.</p><div className="row-actions"><Link href="/check-in" className="btn btn-accent" data-testid="link-dashboard-checkin">Set a check-in <ArrowRight size={15} /></Link><Link href="/assistant" className="btn btn-ghost" style={{ color: 'inherit' }} data-testid="link-dashboard-guide">Ask Guardian</Link></div></section>
       <div className="grid"><div className="card stat-card"><div className="eyebrow">Trusted contacts</div><div className="stat-value" data-testid="text-contact-count">{state.contacts.length}</div><div className="stat-note">{state.contacts.length ? 'Saved in this browser' : 'Add a fictional contact to begin'}</div></div><div className="card stat-card"><div className="eyebrow">Check-in status</div><div className="stat-value" data-testid="status-checkin-dashboard">{active ? 'Active' : state.checkIn?.status === 'overdue' ? 'Overdue' : 'Ready'}</div><div className="stat-note">{active ? 'Only visible in this demo' : 'No external alert is sent'}</div></div></div>
     </div>
     <div className="grid grid-3" style={{ marginTop: 18 }}><Link href="/contacts" className="card" data-testid="link-card-contacts"><UsersRound size={19} color="hsl(var(--accent-foreground))" /><h3 className="card-title" style={{ marginTop: 18 }}>Add a trusted contact</h3><p className="card-copy">Keep fictional details here for this presentation.</p><ChevronRight size={17} style={{ marginTop: 18 }} /></Link><Link href="/map" className="card" data-testid="link-card-map"><Map size={19} color="hsl(var(--accent-foreground))" /><h3 className="card-title" style={{ marginTop: 18 }}>Search a map</h3><p className="card-copy">Open an external map search without invented listings.</p><ChevronRight size={17} style={{ marginTop: 18 }} /></Link><Link href="/digital-safety" className="card" data-testid="link-card-digital"><LockKeyhole size={19} color="hsl(var(--accent-foreground))" /><h3 className="card-title" style={{ marginTop: 18 }}>Check digital safety</h3><p className="card-copy">Work through short, practical scenarios.</p><ChevronRight size={17} style={{ marginTop: 18 }} /></Link></div>
@@ -224,7 +343,7 @@ function AdminPage({ state, setState, flash }: Props) {
 function PrivacyPage({ state, setState, flash, clearData }: Props) {
   const exportData = () => { const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'sheguard-demo-data.json'; anchor.click(); URL.revokeObjectURL(url); flash('Demo JSON export prepared.'); };
   const clear = () => { if (!window.confirm('Clear all locally stored SheGuard demo data from this browser?')) return; if (clearData) clearData(); else { clearDemoState(); setState({ ...initialState, posts: [] }); } flash('Local demo data cleared. No account was deleted.'); };
-  return <><PageHeading eyebrow="Your browser, your control" title="Privacy & demo data" subtitle="See what this presentation build can do, what it cannot do, and remove its local records." /><div className="grid grid-2"><section className="card"><div className="module-icon"><LockKeyhole size={19} /></div><h2 className="card-title" style={{ marginTop: 18 }}>What is stored locally</h2><p className="card-copy">Demo session, fictional contacts, timer state, module completion, community posts and reports, theme, language, and blocked authors may be stored in localStorage.</p><Button data-testid="button-export-data" className="btn-soft" style={{ marginTop: 20 }} onClick={exportData}><FileDown size={15} /> Export demo JSON</Button></section><section className="card"><div className="module-icon"><Trash2 size={19} /></div><h2 className="card-title" style={{ marginTop: 18 }}>Clear this browser</h2><p className="card-copy">Clearing removes this presentation data from this browser. It does not delete an account because no real account or backend exists.</p><Button data-testid="button-clear-data" className="btn-danger" style={{ marginTop: 20 }} onClick={clear}>Clear local demo data</Button></section></div><div className="notice" style={{ marginTop: 18 }}><Info size={17} /><span>Location is not stored by this app. Browser or external map providers may handle location under their own permissions and policies.</span></div></>;
+  return <><PageHeading eyebrow="Your browser, your control" title="Privacy & demo data" subtitle="See what this presentation build can do, what it cannot do, and remove its local records." /><div className="grid grid-2"><section className="card"><div className="module-icon"><LockKeyhole size={19} /></div><h2 className="card-title" style={{ marginTop: 18 }}>What is stored locally</h2><p className="card-copy">Demo session, fictional contacts, timer state, module completion, community posts and reports, theme, language, blocked authors, and Ask Guardian chat history may be stored in localStorage.</p><Button data-testid="button-export-data" className="btn-soft" style={{ marginTop: 20 }} onClick={exportData}><FileDown size={15} /> Export demo JSON</Button></section><section className="card"><div className="module-icon"><Trash2 size={19} /></div><h2 className="card-title" style={{ marginTop: 18 }}>Clear this browser</h2><p className="card-copy">Clearing removes this presentation data from this browser, including Guardian chat history. It does not delete an account because no real account or backend exists.</p><Button data-testid="button-clear-data" className="btn-danger" style={{ marginTop: 20 }} onClick={clear}>Clear local demo data</Button></section></div><div className="notice" style={{ marginTop: 18 }}><Info size={17} /><span>Location is not stored by this app. Browser or external map providers may handle location under their own permissions and policies.</span></div></>;
 }
 
 function App() {
@@ -237,7 +356,7 @@ function App() {
     return () => window.clearTimeout(id);
   }, [toast]);
   const flash = (message: string) => setToast(message);
-  const clearData = () => { skipPersist.current = true; clearDemoState(); setState({ ...initialState, posts: [] }); };
+  const clearData = () => { skipPersist.current = true; clearDemoState(); localStorage.removeItem(GUARDIAN_STORAGE_KEY); setState({ ...initialState, posts: [] }); };
   const props = { state, setState, flash, clearData };
   const session = state.session;
   return <>{!session ? <Switch><Route path="/login"><Login setState={setState} flash={flash} /></Route><Route path="/"><Login setState={setState} flash={flash} /></Route><Route><Login setState={setState} flash={flash} /></Route></Switch> : <Shell {...props}><Switch>
