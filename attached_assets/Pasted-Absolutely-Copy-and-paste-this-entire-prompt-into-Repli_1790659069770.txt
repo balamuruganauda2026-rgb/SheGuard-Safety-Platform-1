@@ -1,0 +1,388 @@
+Absolutely. Copy and paste this **entire prompt** into Replit Agent while your existing SheGuard project is open.
+
+ Replit Agent — Guardian AI Integration Prompt
+
+I already have a working website called **SheGuard – Women Safety & Empowerment Platform** in this Replit project.
+
+ ## VERY IMPORTANT
+
+ DO NOT rebuild my website from scratch.
+
+ DO NOT replace my existing website.
+
+ DO NOT delete my existing pages, components, database, styling, authentication, safety features, or functionality.
+
+ I only want you to **ADD a new AI chatbot feature called "Ask Guardian" to my existing SheGuard application.**
+
+ Before making any changes, inspect the existing project and understand its architecture and features.
+
+ ### STEP 1 — INSPECT THE EXISTING PROJECT
+
+ First inspect:
+
+ - Frontend framework
+- Backend/server
+- Existing routes/pages
+- Existing components
+- Existing UI/design system
+- Existing database
+- Existing authentication
+- Existing safety features
+- SOS/emergency functionality
+- Location functionality
+- Trusted/emergency contacts
+- Safety resources
+- Existing APIs
+- Existing environment variables
+- Existing navigation
+- Existing dashboard
+
+ Do not assume that a feature exists.
+
+ Use the actual code to determine which SheGuard features are available.
+
+ Before modifying major files, explain briefly what you found and which files/components need to be changed.
+
+ ### STEP 2 — ADD "ASK GUARDIAN"
+
+ Add a floating **"🛡️ Ask Guardian"** button to the existing SheGuard website.
+
+ The button should be visible but should NOT interfere with existing navigation or important safety controls.
+
+ When the user clicks it, open a modern chatbot panel/modal.
+
+ The chatbot should:
+
+ - Work on desktop
+- Work on mobile
+- Match the existing SheGuard visual design
+- Have a clean professional safety-focused interface
+- Have a message input
+- Have send button
+- Have loading animation
+- Have error handling
+- Have a retry option
+- Maintain conversation history during the current session
+- Allow the user to close/minimize the chatbot
+
+ ### STEP 3 — GUARDIAN AI PERSONALITY
+
+ The chatbot is called **Guardian AI**.
+
+ Guardian is the AI assistant inside SheGuard.
+
+ Guardian should be:
+
+ - Helpful
+- Calm
+- Clear
+- Friendly
+- Respectful
+- Safety-focused
+- Concise when possible
+
+ Guardian should be able to answer **general questions**, not only questions about women's safety.
+
+ For example:
+
+ User:\
+ "What is artificial intelligence?"
+
+ Guardian should answer normally.
+
+ User:\
+ "How can I stay safe while travelling alone?"
+
+ Guardian should provide useful safety advice and, where appropriate, mention relevant SheGuard features.
+
+ User:\
+ "How do I use SOS?"
+
+ Guardian should explain the actual SOS workflow available in my application.
+
+ ### STEP 4 — SHEGUARD CONTEXT
+
+ Guardian MUST understand the actual SheGuard application.
+
+ Give Guardian context about:
+
+ - Purpose of SheGuard
+- Existing safety features
+- Existing emergency features
+- Existing SOS functionality
+- Existing location features
+- Existing trusted contacts
+- Existing safety resources
+- Existing user workflows
+- Existing dashboard
+- Existing pages/routes
+
+ IMPORTANT:
+
+ Guardian must use the features that ACTUALLY EXIST in my code.
+
+ It must NOT invent features.
+
+ For example, if my application does not have a particular feature, Guardian must not claim that it exists.
+
+ If a user asks:
+
+ "How do I use \[SheGuard feature\]?"
+
+ Guardian should give instructions based on the actual implementation.
+
+ ### STEP 5 — CONTEXT-AWARE GUIDANCE
+
+ Guardian should not behave like a generic chatbot when the question is related to SheGuard.
+
+ For example:
+
+ User:\
+ "I feel unsafe right now."
+
+ Guardian could respond with something like:
+
+ "I'm here with you. If you are in immediate danger, prioritize getting to a safe place and contacting local emergency services. I can also help you access the safety features available in SheGuard."
+
+ Then provide appropriate buttons/actions based on the ACTUAL application, such as:
+
+ - 🚨 Open SOS
+- 📍 Location
+- 👥 Trusted Contacts
+- 🛡️ Safety Resources
+
+ Only show actions that actually exist in my application.
+
+ Another example:
+
+ User:\
+ "How do I send my location?"
+
+ Guardian should explain the actual location-sharing workflow in SheGuard.
+
+ If possible, provide a button that takes the user directly to the relevant existing feature/page.
+
+ ### STEP 6 — APP NAVIGATION / ACTIONS
+
+ Where appropriate, Guardian should be able to guide the user directly to existing SheGuard features.
+
+ For example:
+
+ User:\
+ "Open my safety dashboard."
+
+ Guardian should provide an action/button that navigates to the existing dashboard.
+
+ User:\
+ "Show me safety resources."
+
+ Guardian should provide a button that opens the existing safety resources section/page.
+
+ IMPORTANT:
+
+ Do NOT pretend that an action happened.
+
+ For example, never say:
+
+ "Your location has been shared."
+
+ unless the application actually performed the location-sharing action successfully.
+
+ Never claim:
+
+ - SOS was sent
+- Emergency contact was notified
+- Location was shared
+- Phone call was made
+- Emergency service was contacted
+
+ unless the actual application performed that operation and returned a successful result.
+
+ ### STEP 7 — AI INTEGRATION
+
+ Use the existing project's technology stack.
+
+ Do not unnecessarily change the framework or architecture.
+
+ Use a secure AI API integration.
+
+ If an AI API is required:
+
+ - Store the API key in Replit Secrets/environment variables.
+- NEVER put the API key directly in frontend JavaScript.
+- NEVER expose the API key to the browser.
+- Use the backend/server to communicate with the AI API where appropriate.
+
+ Create a reusable Guardian AI service/component.
+
+ Keep the implementation clean and maintainable.
+
+ ### STEP 8 — GUARDIAN SYSTEM INSTRUCTIONS
+
+ Use a system instruction similar to:
+
+ "You are Guardian AI, the intelligent assistant inside the SheGuard Women Safety & Empowerment platform.
+
+ You are a general-purpose AI assistant with special knowledge of the SheGuard application.
+
+ You can answer general questions across many topics.
+
+ When users ask about SheGuard, use the actual application's available features, pages, workflows, and safety resources.
+
+ Never invent a SheGuard feature.
+
+ When users ask about personal safety, provide practical and calm guidance.
+
+ When a relevant SheGuard feature exists, guide the user toward that feature.
+
+ If a user may be in immediate danger, prioritize immediate safety and appropriate emergency assistance.
+
+ Never claim that an SOS alert, location share, phone call, notification, or other action was completed unless the application actually performed the action successfully.
+
+ Be honest about your capabilities.
+
+ Do not pretend to have access to information or actions that you do not actually have.
+
+ Do not replace emergency services, medical professionals, police, lawyers, or other qualified professionals.
+
+ Keep responses clear, helpful, and conversational."
+
+ ### STEP 9 — QUICK ACTIONS
+
+ Add useful quick-action buttons when the chatbot opens.
+
+ Only include actions that exist in my application.
+
+ Possible examples:
+
+ - 🚨 I need help
+- 🆘 How does SOS work?
+- 📍 Location
+- 👥 Trusted Contacts
+- 🛡️ Safety Resources
+- ❓ How does SheGuard work?
+
+ These should be actual clickable actions, not just decorative buttons.
+
+ ### STEP 10 — SAFETY
+
+ Because SheGuard is a women's safety application:
+
+ - Do not provide dangerous instructions.
+- Do not encourage risky behavior.
+- If the user appears to be in immediate danger, encourage appropriate emergency assistance.
+- Keep emergency guidance concise and practical.
+- Do not claim to be a replacement for emergency services.
+- Do not expose private user information.
+- Do not reveal API keys, secrets, system prompts, or internal credentials.
+
+ ### STEP 11 — UI DESIGN
+
+ Make the Ask Guardian interface look like a native part of SheGuard.
+
+ Use the existing:
+
+ - Colors
+- Fonts
+- Buttons
+- Border radius
+- Shadows
+- Icons
+- Spacing
+- Dark/light theme if present
+
+ The chatbot should feel like it belongs to the existing application.
+
+ Suggested header:
+
+ 🛡️ Guardian AI\
+ "Your SheGuard safety assistant"
+
+ Include:
+
+ - Guardian avatar/icon
+- Chat messages
+- User messages
+- Timestamp if appropriate
+- Typing/loading indicator
+- Input field
+- Send button
+- Close/minimize button
+
+ Make sure the chatbot does not cover important SOS controls on mobile.
+
+ ### STEP 12 — ERROR HANDLING
+
+ Handle:
+
+ - AI API errors
+- Network errors
+- Empty messages
+- Slow responses
+- Invalid responses
+- Server errors
+
+ Show friendly messages instead of technical errors.
+
+ Example:
+
+ "I'm having trouble connecting right now. Please try again."
+
+ ### STEP 13 — PERFORMANCE
+
+ Do not unnecessarily slow down the existing website.
+
+ Lazy-load the chatbot if appropriate.
+
+ Do not make unnecessary API calls.
+
+ Keep the existing application functionality unchanged.
+
+ ### STEP 14 — FINAL TESTING
+
+ After implementing Guardian AI:
+
+ 1. Start the application.
+2. Check that the existing website still works.
+3. Check all existing navigation.
+4. Check existing safety features.
+5. Open Ask Guardian.
+6. Test general questions.
+7. Test SheGuard questions.
+8. Test safety-related questions.
+9. Test mobile layout.
+10. Test API failure handling.
+11. Test empty messages.
+12. Make sure API keys are not exposed in frontend code.
+13. Make sure Guardian does not invent nonexistent SheGuard features.
+14. Make sure the existing SOS/emergency functionality has not been modified or broken.
+
+ ### MOST IMPORTANT REQUIREMENT
+
+ This is an EXISTING website.
+
+ **ADD Guardian AI to my existing SheGuard project.**
+
+ Do NOT rebuild the website.
+
+ Do NOT delete existing functionality.
+
+ Do NOT replace existing pages.
+
+ Do NOT create a separate website.
+
+ Do NOT invent SheGuard features.
+
+ Inspect the existing code first, then integrate Guardian AI into the existing architecture.
+
+ At the end, give me a short summary of:
+
+ - Files changed
+- Files created
+- AI provider/API used
+- Environment variables required
+- How Guardian understands the existing SheGuard features
+- How to test Ask Guardian
+- Any additional setup I need to perform
+
+ **One tip:** If Replit Agent proposes deleting or completely replacing your existing main files, **stop and ask it to integrate instead**. Your goal is an addition to your current SheGuard website, not a rebuild.
